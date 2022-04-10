@@ -2,8 +2,11 @@
 name = "imagetext"
 version = "0.1.0"
 edition = "2021"
+authors = ["Wesley <hcwtam@gmail.com>"]
+description = "A simple app to transform images to ascii art"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 image = "0.23.1"
+clap = { version = "3.1.8", features = ["derive"] }

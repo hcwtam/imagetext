@@ -1,5 +1,7 @@
-use imagetext::transform;
+use imagetext::{cli, transform};
 
 fn main() {
-    transform::run();
+    
+    let args = cli::run();
+    // transform::run();
 }
