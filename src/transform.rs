@@ -1,4 +1,8 @@
+use std::process;
+
 use image::{imageops, GenericImageView};
+
+use super::cli;
 
 /* Characters will be used depending on pixel's approximate grayscale value.
 ** Values are organized from darkest to lightest.
@@ -12,7 +16,10 @@ const DEFAULT_WIDTH: u32 = 120;
 const MULTIPLIER: f64 = 0.45;
 
 fn to_grayscale(file: &str) -> image::DynamicImage {
-    let img = image::open(file).unwrap();
+    let img = image::open(file).unwrap_or_else(|_| {
+        eprintln!("The file: {} you have provided is not found.", file);
+        process::exit(2);
+    });
     let img = img.grayscale();
     img
 }
@@ -59,10 +66,42 @@ fn print_chars(chars: Vec<Vec<char>>) {
     }
 }
 
-pub fn run() {
-    let img = to_grayscale("mudkip.png");
-    let img = resize(img, DEFAULT_WIDTH);
-    img.save("mudkip_grey.png").unwrap();
-    let chars = replace_pixel_with_char(img);
-    print_chars(chars);
+fn print_files(args: &cli::Cli) {
+    for file in &args.files {
+        let img = to_grayscale(file);
+
+        let size = if let Some(s) = &args.size {
+            match s {
+                cli::Size::ExtraSmall => 30,
+                cli::Size::Small => 60,
+                cli::Size::Large => 240,
+                cli::Size::ExtraLarge => 360,
+                _ => DEFAULT_WIDTH,
+            }
+        } else {
+            DEFAULT_WIDTH
+        };
+
+        let img = resize(img, size);
+
+        if args.files.len() > 1 {
+            let mut path = file.split('.').collect::<Vec<&str>>();
+            let name = if path.len() == 1 {
+                path[0]
+            } else {
+                path.reverse();
+                path[1]
+            };
+            println!("{}:", name);
+        }
+
+        let img_chars = replace_pixel_with_char(img);
+        print_chars(img_chars);
+    }
+}
+
+pub fn run(args: cli::Cli) {
+    if args.files.len() > 0 {
+        print_files(&args);
+    }
 }

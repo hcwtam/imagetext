@@ -1,7 +1,9 @@
 use clap::Parser;
 
 #[derive(clap::ArgEnum, Clone, Debug)]
-enum Size {
+pub enum Size {
+    #[clap(alias("xs"))]
+    ExtraSmall,
     #[clap(alias("s"))]
     Small,
     #[clap(alias("n"))]
@@ -18,14 +20,14 @@ enum Size {
 #[clap(author, version, about, long_about = None)]
 #[clap(arg_required_else_help(true))] 
 pub struct Cli {
-    files: Vec<String>,
+    pub files: Vec<String>,
 
     #[clap(short, long)]
-    find: Option<Vec<String>>,
+    pub find: Option<Vec<String>>,
 
     #[clap(short, long)]
     #[clap(arg_enum)]
-    size: Option<Size>,
+    pub size: Option<Size>,
 }
 
 pub fn run()-> Cli {
