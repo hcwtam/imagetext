@@ -1,7 +1,8 @@
 use imagetext::{cli, transform};
 
-fn main() {
+#[tokio::main]
+async fn main() {
     
     let args = cli::run();
-    transform::run(args);
+    transform::run(args).await;
 }

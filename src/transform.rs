@@ -1,7 +1,8 @@
-use std::process;
+use std::{io, process};
 
-use image::{imageops, GenericImageView};
-
+use image::{imageops, GenericImageView, io::Reader as ImageReader};
+use rand::Rng;
+use serde::Deserialize;
 use super::cli;
 
 /* Characters will be used depending on pixel's approximate grayscale value.
@@ -14,6 +15,11 @@ const DEFAULT_WIDTH: u32 = 120;
 
 // to respect height/width ratio of characters. The multiplier value is selected through trial and error.
 const MULTIPLIER: f64 = 0.45;
+
+#[derive(Deserialize)]
+struct Response {
+    results: Vec<String>,
+}
 
 fn to_grayscale(file: &str) -> image::DynamicImage {
     let img = image::open(file).unwrap_or_else(|_| {
@@ -66,22 +72,26 @@ fn print_chars(chars: Vec<Vec<char>>) {
     }
 }
 
+fn get_size(arg_size: &Option<cli::Size>) -> u32 {
+    let size = if let Some(s) = arg_size {
+        match s {
+            cli::Size::ExtraSmall => 30,
+            cli::Size::Small => 60,
+            cli::Size::Large => 240,
+            cli::Size::ExtraLarge => 360,
+            _ => DEFAULT_WIDTH,
+        }
+    } else {
+        DEFAULT_WIDTH
+    };
+
+    size
+}
+
 fn print_files(args: &cli::Cli) {
     for file in &args.files {
         let img = to_grayscale(file);
-
-        let size = if let Some(s) = &args.size {
-            match s {
-                cli::Size::ExtraSmall => 30,
-                cli::Size::Small => 60,
-                cli::Size::Large => 240,
-                cli::Size::ExtraLarge => 360,
-                _ => DEFAULT_WIDTH,
-            }
-        } else {
-            DEFAULT_WIDTH
-        };
-
+        let size = get_size(&args.size);
         let img = resize(img, size);
 
         if args.files.len() > 1 {
@@ -100,8 +110,48 @@ fn print_files(args: &cli::Cli) {
     }
 }
 
-pub fn run(args: cli::Cli) {
+
+async fn print_online_images(names: Vec<String>, input_size: Option<cli::Size>) {
+    for name in names {
+        // fetch images
+        let resp = reqwest::get(format!("https://imsea.herokuapp.com/api/1?q={}", name))
+        .await.unwrap_or_else(|_| {
+            eprintln!("Unable to search for {} at this time.", name);
+            process::exit(2);
+        })
+        .json::<Response>()
+        .await.unwrap_or_else(|_| {
+            eprintln!("Unable to parse search result for {}", name);
+            process::exit(2);
+        });
+    
+        // use a random result
+        let num = rand::thread_rng().gen_range(0..100);
+        let image_res = reqwest::get(&resp.results[num])
+        .await.unwrap_or_else(|_| {
+            eprintln!("Unable to get image of {} at this time.", name);
+            process::exit(2);
+        });
+        
+        let img = io::Cursor::new(image_res.bytes().await.unwrap());
+        let img = ImageReader::new(img).with_guessed_format().unwrap().decode().unwrap();
+        let img = img.grayscale();
+        let size = get_size(&input_size);
+        let img = resize(img, size);
+
+        println!("{}:", name);
+
+        let img_chars = replace_pixel_with_char(img);
+        print_chars(img_chars);
+    }
+}
+
+pub async fn run(args: cli::Cli) {
     if args.files.len() > 0 {
         print_files(&args);
+    }
+
+    if let Some(find) = args.find {
+        print_online_images(find, args.size).await;
     }
 }
